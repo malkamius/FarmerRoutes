@@ -84,6 +84,34 @@ local function ClipLineToCircle(x1, y1, x2, y2, radius)
     return x1 + tStart*dx, y1 + tStart*dy, x1 + tEnd*dx, y1 + tEnd*dy
 end
 
+local function ClipLineToRectangle(x1, y1, x2, y2, w, h)
+    local t0, t1 = 0, 1
+    local dx = x2 - x1
+    local dy = y2 - y1
+    
+    local function clip(p, q)
+        if p == 0 and q < 0 then return false end
+        if p < 0 then
+            local r = q / p
+            if r > t1 then return false end
+            if r > t0 then t0 = r end
+        elseif p > 0 then
+            local r = q / p
+            if r < t0 then return false end
+            if r < t1 then t1 = r end
+        end
+        return true
+    end
+    
+    if clip(-dx, x1 + w) and
+       clip(dx, w - x1) and
+       clip(-dy, y1 + h) and
+       clip(dy, h - y1) then
+        return x1 + t0*dx, y1 + t0*dy, x1 + t1*dx, y1 + t1*dy
+    end
+    return nil
+end
+
 --
 -- Rendering Logic
 --
@@ -157,8 +185,8 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
     
     local sinFacing, cosFacing = 0, 1
     if rotateMinimap then
-        sinFacing = math.sin(-facing)
-        cosFacing = math.cos(-facing)
+        sinFacing = math.sin(facing)
+        cosFacing = math.cos(facing)
     end
     
     -- Sync number of lines to active edges
@@ -195,7 +223,17 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
         local pixelY2 = -(yDist2 / mapRadius) * minimapHeight
         
         -- Clip to Minimap Radius to prevent lines bleeding outside UI
-        local cx1, cy1, cx2, cy2 = ClipLineToCircle(pixelX1, pixelY1, pixelX2, pixelY2, displayRadius)
+        local cx1, cy1, cx2, cy2
+        local isRound = true
+        if GetMinimapShape then
+            isRound = (GetMinimapShape() and GetMinimapShape() == "ROUND")
+        end
+        
+        if isRound then
+            cx1, cy1, cx2, cy2 = ClipLineToCircle(pixelX1, pixelY1, pixelX2, pixelY2, displayRadius)
+        else
+            cx1, cy1, cx2, cy2 = ClipLineToRectangle(pixelX1, pixelY1, pixelX2, pixelY2, minimapWidth, minimapHeight)
+        end
         
         if cx1 then
             line:SetStartPoint("CENTER", Minimap, cx1, cy1)
