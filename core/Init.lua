@@ -27,6 +27,7 @@ local DEFAULT_SETTINGS = {
         edgeColor = { 1, 1, 0, 0.3 },
         edgeThickness = 2,
     },
+    hudPosition = { point = "CENTER", xOfs = 0, yOfs = 150 },
 }
 
 local DEFAULT_MINIMAP_SETTINGS = {

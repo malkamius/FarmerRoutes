@@ -558,8 +558,8 @@ function Toolbar.Init()
     btnImport:SetNormalTexture("Interface\\Icons\\INV_Misc_Bag_10_Blue")
     btnImport:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square")
     btnImport:SetScript("OnClick", function()
-        if NS.ImportUI then
-            NS.ImportUI.Show()
+        if NS.SettingsUI and NS.SettingsUI.ShowTab then
+            NS.SettingsUI.ShowTab("sync")
         end
     end)
     btnImport:SetScript("OnEnter", function(self)

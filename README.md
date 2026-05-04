@@ -10,11 +10,11 @@
 
 *   **🌐 Graph-Based Architecture**: Build complex, non-linear routes with interconnected nodes and edges.
 *   **🛠️ World Map Editor**: Edit your routes directly on the World Map with intuitive mouse controls.
-*   **🎯 Smart Navigation HUD**: A center-screen directional arrow and distance readout to guide you to the next node on your path.
+*   **🎯 Smart Navigation HUD**: A draggable directional arrow and distance readout with predictive "look-ahead" logic to guide you seamlessly through your route.
 *   **📍 High-Fidelity Minimap**: Zoom-aware, interpolated dot-lines that provide a smooth visual path without cluttering your minimap.
 *   **🎨 Advanced Styling & Inheritance**: Granular control over node and edge visuals with a 3-tier inheritance model (Global → Route → Item).
 *   **🔄 Sync & Sharing**: Import/Export routes via strings. Fully compatible with legacy RoutePlanner strings.
-*   **👥 Multi-Character Support**: Manage and import routes across all your characters from a single interface.
+*   **👥 Multi-Character Support**: Manage routes across all your characters with bulk import capabilities.
 
 ---
 
@@ -33,7 +33,8 @@ Enter **Edit Mode** by clicking the wrench icon on the World Map toolbar.
 ### Navigation HUD
 Toggle the HUD to get directional guidance to your next farm node.
 *   **Shift + Left-Click (Minimap Button)**: Quickly toggle the HUD on/off.
-*   **Smart Logic**: The HUD automatically detects your direction of travel and targets the most logical next node on the route.
+*   **Draggable Interface**: Click and drag the HUD to reposition it anywhere on your screen.
+*   **Smart Logic & Look-Ahead**: The HUD automatically detects your direction of travel and targets the most logical next node. When within 20 yards of a target, it automatically "looks ahead" to the next node in the sequence for seamless navigation.
 
 ### Slash Commands
 *   `/fr` — Open main settings.

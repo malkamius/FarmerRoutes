@@ -129,6 +129,19 @@ function UI.RenderRoutes()
         if NS.NavigationHUD then NS.NavigationHUD.UpdateVisibility() end
     end)
 
+    -- Reset HUD Position Button
+    local btnResetHUD = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+    btnResetHUD:SetSize(120, 22)
+    btnResetHUD:SetPoint("LEFT", cbHUD.text, "RIGHT", 10, 0)
+    btnResetHUD:SetText("Reset Position")
+    btnResetHUD:SetScript("OnClick", function()
+        NS.DB.settings.hudPosition = { point = "CENTER", xOfs = 0, yOfs = 150 }
+        if NS.NavigationHUD then
+            NS.NavigationHUD.UpdatePosition()
+        end
+        print("|cFFFFFF00FarmerRoutes|r: Navigation HUD position reset.")
+    end)
+
     yOffset = yOffset - 40
 
     -- Route Manager Header
@@ -354,6 +367,27 @@ function UI.RenderSync()
             local charHeader = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
             charHeader:SetPoint("TOPLEFT", 10, yOffset)
             charHeader:SetText(charKey)
+            
+            local btnAll = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+            btnAll:SetSize(80, 18)
+            btnAll:SetPoint("TOPRIGHT", -10, yOffset)
+            btnAll:SetText("Import All")
+            btnAll:SetScript("OnClick", function()
+                for rName, rData in pairs(charData.routes) do
+                    local newRoute = NS.Utils.DeepCopy(rData)
+                    local name = rName
+                    local i = 1
+                    while NS.Routes[name] do
+                        name = rName .. " (" .. i .. ")"
+                        i = i + 1
+                    end
+                    newRoute.name = name
+                    NS.Routes[name] = newRoute
+                    print("|cFFFFFF00FarmerRoutes|r: Imported '" .. name .. "' from " .. charKey)
+                end
+                UI.Refresh()
+            end)
+
             yOffset = yOffset - 20
 
             for routeName, _ in pairs(charData.routes) do
@@ -579,4 +613,10 @@ end)
 
 function UI.Toggle()
     if frame:IsShown() then frame:Hide() else frame:Show() end
+end
+
+function UI.ShowTab(id)
+    currentTab = id or "routes"
+    frame:Show()
+    UI.Refresh()
 end
