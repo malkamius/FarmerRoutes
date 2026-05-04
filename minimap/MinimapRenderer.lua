@@ -3,7 +3,7 @@ local ADDON_NAME, NS = ...
 NS.MinimapRenderer = {}
 local Renderer = NS.MinimapRenderer
 
-local HBDPins = LibStub("HereBeDragons-Pins-2.0")
+local HBD = LibStub("HereBeDragons-2.0")
 
 --
 -- Minimap Constants
@@ -20,174 +20,199 @@ local function GetCurrentMinimapDiameter()
     return MINIMAP_DIAMETERS[type][zoom] or 466.66
 end
 
-local function GetDynamicSpacing()
-    local diameter = GetCurrentMinimapDiameter()
-    local minimapWidth = Minimap:GetWidth()
-    local dotSize = NS.DB.settings.dotSize or 4
-
-    -- Target 50% overlap for a very solid, smooth line.
-    local targetPixelSpacing = dotSize * 0.5
-    local yardsPerPixel = diameter / minimapWidth
-    return targetPixelSpacing * yardsPerPixel
-end
-
 --
 -- Object Pooling
 --
-local dotPool = {}
-local activeDots = {}
+local linePool = {}
+local activeLines = {}
+local activeEdges = {}
 
-local function AcquireDot()
-    local dot = table.remove(dotPool)
-    if not dot then
-        dot = CreateFrame("Frame", nil, Minimap)
-        dot:SetSize(8, 8)
-        -- Set low frame level to stay behind player arrow
-        dot:SetFrameLevel(Minimap:GetFrameLevel() + 1)
-
-        dot.tex = dot:CreateTexture(nil, "ARTWORK")
-        dot.tex:SetAllPoints()
-        dot.tex:SetColorTexture(1, 1, 1, 1)
-
-        dot.mask = dot:CreateMaskTexture()
-        dot.mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask")
-        dot.mask:SetAllPoints(dot.tex)
-        dot.tex:AddMaskTexture(dot.mask)
+local function AcquireLine()
+    local line = table.remove(linePool)
+    if not line then
+        line = Minimap:CreateLine(nil, "OVERLAY")
+        line:SetDrawLayer("OVERLAY", 7)
     end
-    dot:Show()
-    table.insert(activeDots, dot)
-    return dot
+    line:Show()
+    table.insert(activeLines, line)
+    return line
 end
 
-local function ReleaseAllDots()
-    for _, dot in ipairs(activeDots) do
-        dot:Hide()
-        table.insert(dotPool, dot)
+local function ReleaseAllLines()
+    for _, line in ipairs(activeLines) do
+        line:Hide()
+        table.insert(linePool, line)
     end
-    HBDPins:RemoveAllMinimapIcons(Renderer)
-    table.wipe(activeDots)
+    table.wipe(activeLines)
 end
 
 --
--- Interpolation
+-- Math Clipping
 --
-local function InterpolateEdge(mapID, n1, n2, dotSpacing)
-    local points = {}
-    local wX1, wY1 = NS.HBD:GetWorldCoordinatesFromZone(n1.x, n1.y, mapID)
-    local wX2, wY2 = NS.HBD:GetWorldCoordinatesFromZone(n2.x, n2.y, mapID)
-
-    if not wX1 or not wX2 then return points end
-
-    local dist = math.sqrt((wX2 - wX1) ^ 2 + (wY2 - wY1) ^ 2)
-    local numDots = math.floor(dist / dotSpacing)
-
-    if numDots <= 1 then
-        table.insert(points, { x = n1.x, y = n1.y })
-        table.insert(points, { x = n2.x, y = n2.y })
-        return points
-    end
-
-    for i = 0, numDots do
-        local t = i / numDots
-        table.insert(points, {
-            x = n1.x + (n2.x - n1.x) * t,
-            y = n1.y + (n2.y - n1.y) * t
-        })
-    end
-
-    return points
-end
-
-local routePoints = {}
-
-function Renderer.RecalculateRoutePoints(routeName)
-    local route = NS.Routes[routeName]
-    if not route or not route.visible then
-        routePoints[routeName] = nil
-        return
-    end
-
-    routePoints[routeName] = {}
-    local spacing = GetDynamicSpacing()
-    local mapID = route.mapID
-
-    for _, edge in ipairs(route.edges) do
-        local n1 = route.nodes[edge[1]]
-        local n2 = route.nodes[edge[2]]
-        if n1 and n2 then
-            local style = NS.Data.GetEffectiveEdgeStyle(route, edge)
-            local er, eg, eb, ea = unpack(style.edgeColor)
-            local es = style.edgeThickness
-
-            local points = InterpolateEdge(mapID, n1, n2, spacing)
-            for _, pt in ipairs(points) do
-                table.insert(routePoints[routeName], {
-                    x = pt.x,
-                    y = pt.y,
-                    mapID = mapID,
-                    r = er,
-                    g = eg,
-                    b = eb,
-                    a = ea,
-                    size = es
-                })
-            end
+local function ClipLineToCircle(x1, y1, x2, y2, radius)
+    local dx = x2 - x1
+    local dy = y2 - y1
+    
+    local a = dx*dx + dy*dy
+    if a == 0 then
+        if x1*x1 + y1*y1 <= radius*radius then
+            return x1, y1, x2, y2
+        else
+            return nil
         end
     end
-end
-
-function Renderer.RecalculateAll(currentMapID)
-    routePoints = {}
-    for name, route in pairs(NS.Routes) do
-        if route.visible and route.mapID == currentMapID then
-            Renderer.RecalculateRoutePoints(name)
-        end
+    
+    local b = 2 * (x1*dx + y1*dy)
+    local c = x1*x1 + y1*y1 - radius*radius
+    
+    local discriminant = b*b - 4*a*c
+    if discriminant < 0 then
+        return nil -- No intersection
     end
+    
+    local sqrtDisc = math.sqrt(discriminant)
+    local t1 = (-b - sqrtDisc) / (2*a)
+    local t2 = (-b + sqrtDisc) / (2*a)
+    
+    local tStart = math.max(0, math.min(t1, t2))
+    local tEnd = math.min(1, math.max(t1, t2))
+    
+    if tStart > 1 or tEnd < 0 or tStart > tEnd then
+        return nil -- Segment is outside the circle
+    end
+    
+    return x1 + tStart*dx, y1 + tStart*dy, x1 + tEnd*dx, y1 + tEnd*dy
 end
 
 --
--- Drawing
+-- Rendering Logic
 --
 local isDirty = true
 function Renderer.MarkDirty()
     isDirty = true
 end
 
-function Renderer.RedrawMinimap()
-    ReleaseAllDots()
-    if not NS.DB.settings.minimapEnabled then return end
-
-    local currentMapID = NS.HBD:GetPlayerZone()
-    if not currentMapID then return end
-
-    Renderer.RecalculateAll(currentMapID)
-
-    local dotSize = NS.DB.settings.dotSize or 4
-
-    for _, points in pairs(routePoints) do
-        for _, pt in ipairs(points) do
-            local dot = AcquireDot()
-            local size = pt.size or dotSize
-            dot:SetSize(size, size)
-            local displayAlpha = pt.a
-            if size > 4 then
-                displayAlpha = displayAlpha * (2 / (size * 8))
+function Renderer.RecalculateAll(currentMapID)
+    activeEdges = {}
+    for name, route in pairs(NS.Routes) do
+        if route.visible and route.mapID == currentMapID then
+            for _, edge in ipairs(route.edges) do
+                local n1 = route.nodes[edge[1]]
+                local n2 = route.nodes[edge[2]]
+                if n1 and n2 then
+                    local style = NS.Data.GetEffectiveEdgeStyle(route, edge)
+                    
+                    local wx1, wy1 = HBD:GetWorldCoordinatesFromZone(n1.x, n1.y, currentMapID)
+                    local wx2, wy2 = HBD:GetWorldCoordinatesFromZone(n2.x, n2.y, currentMapID)
+                    
+                    if wx1 and wx2 then
+                        table.insert(activeEdges, {
+                            r = style.edgeColor[1],
+                            g = style.edgeColor[2],
+                            b = style.edgeColor[3],
+                            a = style.edgeColor[4],
+                            thickness = style.edgeThickness,
+                            wX1 = wx1, wY1 = wy1,
+                            wX2 = wx2, wY2 = wy2
+                        })
+                    end
+                end
             end
-            dot.tex:SetColorTexture(pt.r, pt.g, pt.b, displayAlpha)
-            -- We already filtered by mapID in RecalculateAll, so these points are all in currentMapID
-            HBDPins:AddMinimapIconMap(Renderer, dot, pt.mapID, pt.x, pt.y, false, false)
         end
     end
 end
 
+function Renderer.RedrawMinimap()
+    ReleaseAllLines()
+    if not NS.DB.settings.minimapEnabled then return end
+
+    local currentMapID = HBD:GetPlayerZone()
+    if not currentMapID then return end
+
+    Renderer.RecalculateAll(currentMapID)
+end
+
+--
+-- OnUpdate
+--
 local updateFrame = CreateFrame("Frame")
 updateFrame:SetScript("OnUpdate", function(self, elapsed)
     if isDirty then
         Renderer.RedrawMinimap()
         isDirty = false
     end
+    
+    if not NS.DB.settings.minimapEnabled or #activeEdges == 0 then return end
+    
+    local px, py, instanceID = HBD:GetPlayerWorldPosition()
+    if not px or not py then return end
+    
+    local facing = GetPlayerFacing() or 0
+    local rotateMinimap = GetCVar("rotateMinimap") == "1"
+    
+    local mapRadius = GetCurrentMinimapDiameter() / 2
+    local minimapWidth = Minimap:GetWidth() / 2
+    local minimapHeight = Minimap:GetHeight() / 2
+    local displayRadius = math.min(minimapWidth, minimapHeight)
+    
+    local sinFacing, cosFacing = 0, 1
+    if rotateMinimap then
+        sinFacing = math.sin(-facing)
+        cosFacing = math.cos(-facing)
+    end
+    
+    -- Sync number of lines to active edges
+    while #activeLines < #activeEdges do
+        AcquireLine()
+    end
+    while #activeLines > #activeEdges do
+        local line = table.remove(activeLines)
+        line:Hide()
+        table.insert(linePool, line)
+    end
+    
+    for i, edge in ipairs(activeEdges) do
+        local line = activeLines[i]
+        
+        -- Start point
+        local xDist1, yDist1 = px - edge.wX1, py - edge.wY1
+        if rotateMinimap then
+            local dx, dy = xDist1, yDist1
+            xDist1 = dx * cosFacing - dy * sinFacing
+            yDist1 = dx * sinFacing + dy * cosFacing
+        end
+        local pixelX1 = (xDist1 / mapRadius) * minimapWidth
+        local pixelY1 = -(yDist1 / mapRadius) * minimapHeight
+        
+        -- End point
+        local xDist2, yDist2 = px - edge.wX2, py - edge.wY2
+        if rotateMinimap then
+            local dx, dy = xDist2, yDist2
+            xDist2 = dx * cosFacing - dy * sinFacing
+            yDist2 = dx * sinFacing + dy * cosFacing
+        end
+        local pixelX2 = (xDist2 / mapRadius) * minimapWidth
+        local pixelY2 = -(yDist2 / mapRadius) * minimapHeight
+        
+        -- Clip to Minimap Radius to prevent lines bleeding outside UI
+        local cx1, cy1, cx2, cy2 = ClipLineToCircle(pixelX1, pixelY1, pixelX2, pixelY2, displayRadius)
+        
+        if cx1 then
+            line:SetStartPoint("CENTER", Minimap, cx1, cy1)
+            line:SetEndPoint("CENTER", Minimap, cx2, cy2)
+            
+            line:SetThickness(edge.thickness or 4)
+            line:SetColorTexture(edge.r, edge.g, edge.b, edge.a)
+            line:Show()
+        else
+            line:Hide()
+        end
+    end
 end)
 
+--
+-- Events
+--
 local EventFrame = CreateFrame("Frame")
 EventFrame:RegisterEvent("PLAYER_LOGIN")
 EventFrame:RegisterEvent("MINIMAP_UPDATE_ZOOM")
