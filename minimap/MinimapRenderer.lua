@@ -141,7 +141,11 @@ function Renderer.RecalculateAll(currentMapID)
                             a = style.edgeColor[4],
                             thickness = style.edgeThickness,
                             wX1 = wx1, wY1 = wy1,
-                            wX2 = wx2, wY2 = wy2
+                            wX2 = wx2, wY2 = wy2,
+                            minX = math.min(wx1, wx2),
+                            maxX = math.max(wx1, wx2),
+                            minY = math.min(wy1, wy2),
+                            maxY = math.max(wy1, wy2)
                         })
                     end
                 end
@@ -189,6 +193,12 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
         cosFacing = math.cos(facing)
     end
     
+    local cullRadius = mapRadius * 1.5
+    local cullLeft = px - cullRadius
+    local cullRight = px + cullRadius
+    local cullBottom = py - cullRadius
+    local cullTop = py + cullRadius
+    
     -- Sync number of lines to active edges
     while #activeLines < #activeEdges do
         AcquireLine()
@@ -202,48 +212,53 @@ updateFrame:SetScript("OnUpdate", function(self, elapsed)
     for i, edge in ipairs(activeEdges) do
         local line = activeLines[i]
         
-        -- Start point
-        local xDist1, yDist1 = px - edge.wX1, py - edge.wY1
-        if rotateMinimap then
-            local dx, dy = xDist1, yDist1
-            xDist1 = dx * cosFacing - dy * sinFacing
-            yDist1 = dx * sinFacing + dy * cosFacing
-        end
-        local pixelX1 = (xDist1 / mapRadius) * minimapWidth
-        local pixelY1 = -(yDist1 / mapRadius) * minimapHeight
-        
-        -- End point
-        local xDist2, yDist2 = px - edge.wX2, py - edge.wY2
-        if rotateMinimap then
-            local dx, dy = xDist2, yDist2
-            xDist2 = dx * cosFacing - dy * sinFacing
-            yDist2 = dx * sinFacing + dy * cosFacing
-        end
-        local pixelX2 = (xDist2 / mapRadius) * minimapWidth
-        local pixelY2 = -(yDist2 / mapRadius) * minimapHeight
-        
-        -- Clip to Minimap Radius to prevent lines bleeding outside UI
-        local cx1, cy1, cx2, cy2
-        local isRound = true
-        if GetMinimapShape then
-            isRound = (GetMinimapShape() and GetMinimapShape() == "ROUND")
-        end
-        
-        if isRound then
-            cx1, cy1, cx2, cy2 = ClipLineToCircle(pixelX1, pixelY1, pixelX2, pixelY2, displayRadius)
-        else
-            cx1, cy1, cx2, cy2 = ClipLineToRectangle(pixelX1, pixelY1, pixelX2, pixelY2, minimapWidth, minimapHeight)
-        end
-        
-        if cx1 then
-            line:SetStartPoint("CENTER", Minimap, cx1, cy1)
-            line:SetEndPoint("CENTER", Minimap, cx2, cy2)
-            
-            line:SetThickness(edge.thickness or 4)
-            line:SetColorTexture(edge.r, edge.g, edge.b, edge.a)
-            line:Show()
-        else
+        -- FAST EARLY OUT CULLING
+        if edge.maxX < cullLeft or edge.minX > cullRight or edge.maxY < cullBottom or edge.minY > cullTop then
             line:Hide()
+        else
+            -- Start point
+            local xDist1, yDist1 = px - edge.wX1, py - edge.wY1
+            if rotateMinimap then
+                local dx, dy = xDist1, yDist1
+                xDist1 = dx * cosFacing - dy * sinFacing
+                yDist1 = dx * sinFacing + dy * cosFacing
+            end
+            local pixelX1 = (xDist1 / mapRadius) * minimapWidth
+            local pixelY1 = -(yDist1 / mapRadius) * minimapHeight
+            
+            -- End point
+            local xDist2, yDist2 = px - edge.wX2, py - edge.wY2
+            if rotateMinimap then
+                local dx, dy = xDist2, yDist2
+                xDist2 = dx * cosFacing - dy * sinFacing
+                yDist2 = dx * sinFacing + dy * cosFacing
+            end
+            local pixelX2 = (xDist2 / mapRadius) * minimapWidth
+            local pixelY2 = -(yDist2 / mapRadius) * minimapHeight
+            
+            -- Clip to Minimap Radius to prevent lines bleeding outside UI
+            local cx1, cy1, cx2, cy2
+            local isRound = true
+            if GetMinimapShape then
+                isRound = (GetMinimapShape() and GetMinimapShape() == "ROUND")
+            end
+            
+            if isRound then
+                cx1, cy1, cx2, cy2 = ClipLineToCircle(pixelX1, pixelY1, pixelX2, pixelY2, displayRadius)
+            else
+                cx1, cy1, cx2, cy2 = ClipLineToRectangle(pixelX1, pixelY1, pixelX2, pixelY2, minimapWidth, minimapHeight)
+            end
+            
+            if cx1 then
+                line:SetStartPoint("CENTER", Minimap, cx1, cy1)
+                line:SetEndPoint("CENTER", Minimap, cx2, cy2)
+                
+                line:SetThickness(edge.thickness or 4)
+                line:SetColorTexture(edge.r, edge.g, edge.b, edge.a)
+                line:Show()
+            else
+                line:Hide()
+            end
         end
     end
 end)
