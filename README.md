@@ -1,24 +1,22 @@
 # FarmerRoutes — Graph-Based Routing for WoW TBC
 
-![FarmerRoutes Banner](C:\Users\Giaken\.gemini\antigravity\brain\75e1ea27-e4eb-4bf0-8396-8f0ece798f3d\farmer_routes_banner_1777905753977.png)
-
 **FarmerRoutes** is a reimagined routing system for World of Warcraft: The Burning Crusade. Unlike traditional routing addons that use linear arrays of waypoints, FarmerRoutes uses a **graph-based data model**. This allows for natural branching, intersections, and loops, making it the perfect tool for complex farming routes (Gas Clouds, Herbs, and Ore) in Outland.
 
 ---
 
-## 🚀 Key Features
+## Key Features
 
-*   **🌐 Graph-Based Architecture**: Build complex, non-linear routes with interconnected nodes and edges.
-*   **🛠️ World Map Editor**: Edit your routes directly on the World Map with intuitive mouse controls.
-*   **🎯 Smart Navigation HUD**: A draggable directional arrow and distance readout with predictive "look-ahead" logic to guide you seamlessly through your route.
-*   **📍 High-Fidelity Minimap**: Zoom-aware, interpolated dot-lines that provide a smooth visual path without cluttering your minimap.
-*   **🎨 Advanced Styling & Inheritance**: Granular control over node and edge visuals with a 3-tier inheritance model (Global → Route → Item).
-*   **🔄 Sync & Sharing**: Import/Export routes via strings. Fully compatible with legacy RoutePlanner strings.
-*   **👥 Multi-Character Support**: Manage routes across all your characters with bulk import capabilities.
+*   **Graph-Based Architecture**: Build complex, non-linear routes with interconnected nodes and edges.
+*   **World Map Editor**: Edit your routes directly on the World Map with intuitive mouse controls.
+*   **Smart Navigation HUD**: A draggable directional arrow and distance readout with predictive "look-ahead" logic to guide you seamlessly through your route.
+*   **High-Fidelity Minimap**: Zoom-aware, interpolated dot-lines that provide a smooth visual path without cluttering your minimap.
+*   **Advanced Styling & Inheritance**: Granular control over node and edge visuals with a 3-tier inheritance model (Global → Route → Item).
+*   **Sync & Sharing**: Import/Export routes via strings. Fully compatible with legacy RoutePlanner strings.
+*   **Multi-Character Support**: Manage routes across all your characters with bulk import capabilities.
 
 ---
 
-## 🎮 How to Use
+## How to Use
 
 ### Map Editor Controls
 Enter **Edit Mode** by clicking the wrench icon on the World Map toolbar.
@@ -43,7 +41,7 @@ Toggle the HUD to get directional guidance to your next farm node.
 
 ---
 
-## 🔧 Styling System
+## Styling System
 
 FarmerRoutes uses a powerful inheritance model for visuals:
 1.  **Global Default**: Set the default look for all routes in the main settings.
