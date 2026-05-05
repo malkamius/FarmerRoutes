@@ -1,4 +1,4 @@
-# FarmerRoutes — Graph-Based Routing for WoW TBC
+# FarmerRoutes — Graph-Based Routes/Paths for WoW TBC
 
 **FarmerRoutes** is a reimagined routing system for World of Warcraft: The Burning Crusade. Unlike traditional routing addons that use linear arrays of waypoints, FarmerRoutes uses a **graph-based data model**. This allows for natural branching, intersections, and loops, making it the perfect tool for complex farming routes (Gas Clouds, Herbs, and Ore) in Outland.
 
@@ -9,7 +9,7 @@
 *   **Graph-Based Architecture**: Build complex, non-linear routes with interconnected nodes and edges.
 *   **World Map Editor**: Edit your routes directly on the World Map with intuitive mouse controls.
 *   **Smart Navigation HUD**: A draggable directional arrow and distance readout with predictive "look-ahead" logic to guide you seamlessly through your route.
-*   **High-Fidelity Minimap**: Zoom-aware, interpolated dot-lines that provide a smooth visual path without cluttering your minimap.
+*   **Minimap Overlay**: Zoom-aware, lines that provide a visual path without cluttering your minimap.
 *   **Advanced Styling & Inheritance**: Granular control over node and edge visuals with a 3-tier inheritance model (Global → Route → Item).
 *   **Sync & Sharing**: Import/Export routes via strings. Fully compatible with legacy RoutePlanner strings.
 *   **Multi-Character Support**: Manage routes across all your characters with bulk import capabilities.
@@ -50,14 +50,3 @@ FarmerRoutes uses a powerful inheritance model for visuals:
 
 Access the **Style Drawer** by clicking the gear icon on the World Map toolbar while a route is selected.
 
----
-
-## 📦 Installation
-
-1.  Download the latest release.
-2.  Extract the `FarmerRoutes` folder into your `Interface/AddOns` directory.
-3.  Restart WoW or `/reload`.
-
----
-
-*Crafted with ❤️ for the TBC farming community.*

@@ -160,7 +160,7 @@ function UI.RenderRoutes()
         if NS.Data.CreateRoute(name, mapID) then
             if NS.MapEditor then NS.MapEditor.SetEditMode(name) end
             if not WorldMapFrame:IsShown() then ToggleWorldMap() end
-            RefreshUI()
+            UI.Refresh()
         end
     end)
 
@@ -232,7 +232,7 @@ function UI.RenderRoutes()
         btnDel:SetText("Del")
         btnDel:SetScript("OnClick", function()
             NS.Data.DeleteRoute(name)
-            RefreshUI()
+            UI.Refresh()
             if NS.MapRenderer then NS.MapRenderer.DrawRoutes() end
             if NS.MinimapRenderer then NS.MinimapRenderer.MarkDirty() end
         end)

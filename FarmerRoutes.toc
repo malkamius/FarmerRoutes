@@ -1,8 +1,8 @@
-## Interface: 20504
+## Interface: 20505
 ## Title: FarmerRoutes
 ## Notes: Graph-based routing system for farming routes.
 ## Author: Gemini
-## Version: 1.0.3
+## Version: 1.0.4
 ## SavedVariables: FarmerRoutesDB
 
 # Libraries

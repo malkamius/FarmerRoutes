@@ -16,13 +16,13 @@ local DEFAULT_SETTINGS = {
     mapToolbarHidden = false,
     routeColors = { 1, 1, 0, 0.3 },
     globalStyle = {
-        nodeColor = { 1, 1, 1, 1 },
+        nodeColor = { 1, 1, 1, 0.5 },
         nodeSize = 8,
         edgeColor = { 1, 1, 0, 0.3 },
         edgeThickness = 2,
     },
     currentStyle = {
-        nodeColor = { 1, 1, 1, 1 },
+        nodeColor = { 1, 1, 1, 0.5 },
         nodeSize = 8,
         edgeColor = { 1, 1, 0, 0.3 },
         edgeThickness = 2,
@@ -160,9 +160,9 @@ SlashCmdList["FARMERROUTES"] = function(msg)
     for arg in msg:gmatch("%S+") do
         table.insert(args, arg)
     end
-    
+
     local cmd = (args[1] or ""):lower()
-    
+
     if cmd == "import" then
         if args[2] then
             local str = msg:sub(#args[1] + 2)
