@@ -192,6 +192,9 @@ function Data.SetRouteVisible(name, visible)
     local route = NS.Routes[name]
     if not route or NS.LockedRoutes[name] then return false end
     route.visible = visible
+    if NS.MinimapRenderer and NS.MinimapRenderer.MarkDirty then
+        NS.MinimapRenderer.MarkDirty()
+    end
     return true
 end
 
@@ -199,6 +202,9 @@ function Data.SetRouteColor(name, r, g, b, a)
     local route = NS.Routes[name]
     if not route or NS.LockedRoutes[name] then return false end
     route.color = {r, g, b, a}
+    if NS.MinimapRenderer and NS.MinimapRenderer.MarkDirty then
+        NS.MinimapRenderer.MarkDirty()
+    end
     return true
 end
 

@@ -511,7 +511,7 @@ function Toolbar.Init()
         if NS.MapEditor.activeRouteName then
             local route = NS.Routes[NS.MapEditor.activeRouteName]
             if route then
-                route.visible = not route.visible
+                NS.Data.SetRouteVisible(NS.MapEditor.activeRouteName, not route.visible)
                 UpdateToolbarUI()
                 if NS.MapRenderer then NS.MapRenderer.DrawRoutes() end
             end
