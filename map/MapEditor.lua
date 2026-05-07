@@ -167,12 +167,13 @@ local function OnMouseDown(self, button)
     local hitType, hitTarget = GetHitTargets(normX, normY)
     
     if button == "LeftButton" then
+        local cx, cy = GetCursorPosition()
+        Editor.dragStartX = cx
+        Editor.dragStartY = cy
+
         if hitType == "node" then
             if not IsControlKeyDown() then
                 Editor.draggedNodeID = hitTarget
-                local cx, cy = GetCursorPosition()
-                Editor.dragStartX = cx
-                Editor.dragStartY = cy
             end
         end
     end
@@ -230,16 +231,7 @@ local function OnMouseUp(self, button)
             Editor.selectedNodeID = nil
             Editor.selectedEdge = nil
             if NS.MapRenderer and NS.MapRenderer.DrawRoutes then NS.MapRenderer.DrawRoutes() end
-        if NS.MinimapRenderer and NS.MinimapRenderer.MarkDirty then NS.MinimapRenderer.MarkDirty() end
-            
-            -- Attempt to zoom out the map like normal
-            if WorldMapZoomOutButton and WorldMapZoomOutButton:IsShown() then
-                WorldMapZoomOutButton:Click()
-            elseif WorldMapFrame.HandleUserActionRightClick then
-                WorldMapFrame:HandleUserActionRightClick()
-            elseif WorldMapFrame_OnRightClick then
-                WorldMapFrame_OnRightClick()
-            end
+            if NS.MinimapRenderer and NS.MinimapRenderer.MarkDirty then NS.MinimapRenderer.MarkDirty() end
         end
         return
     end
@@ -326,8 +318,17 @@ local function OnMouseUp(self, button)
                 end
             else
                 -- Plain click on empty space: clear selection
-                Editor.selectedNodeID = nil
-                Editor.selectedEdge = nil
+                -- But only if we didn't move the mouse significantly (e.g. panning)
+                local cx, cy = GetCursorPosition()
+                local dist = 0
+                if Editor.dragStartX and Editor.dragStartY then
+                    dist = math.sqrt((cx - Editor.dragStartX)^2 + (cy - Editor.dragStartY)^2)
+                end
+
+                if dist < 5 then
+                    Editor.selectedNodeID = nil
+                    Editor.selectedEdge = nil
+                end
             end
         end
         -- Refresh map
@@ -344,12 +345,26 @@ local function GetClickFrame()
         if canvas then
             clickFrame = CreateFrame("Button", "FarmerRoutesEditorClickFrame", canvas)
             clickFrame:SetAllPoints()
-            clickFrame:SetFrameLevel(2001) -- Above the drawing layer
+            clickFrame:SetFrameStrata("DIALOG")
+            clickFrame:SetFrameLevel(10000) -- High level to be above other pins
             clickFrame:RegisterForClicks("LeftButtonUp", "LeftButtonDown", "RightButtonUp")
+            clickFrame:SetPropagateMouseClicks(true)
+            clickFrame:SetPropagateMouseMotion(true)
             clickFrame:SetScript("OnMouseDown", OnMouseDown)
             clickFrame:SetScript("OnMouseUp", OnMouseUp)
             
             clickFrame:SetScript("OnUpdate", function(self)
+                -- Selective Propagation:
+                -- If we are over a node/edge, or if Control is held (adding node),
+                -- we block propagation so we don't click through to icons or pan the map.
+                local normX, normY = GetCursorNormalizedCoords()
+                local hitType, hitTarget = GetHitTargets(normX, normY)
+                if hitType or IsControlKeyDown() or Editor.draggedNodeID then
+                    self:SetPropagateMouseClicks(false)
+                else
+                    self:SetPropagateMouseClicks(true)
+                end
+
                 if Editor.draggedNodeID and Editor.activeRouteName then
                     local cx, cy = GetCursorPosition()
                     local dist = 0
@@ -428,7 +443,7 @@ function Editor.GetSelectedEdge()
     return Editor.selectedEdge
 end
 
-function Editor.UpdateSelectedStyle()
+function Editor.UpdateSelectedStyle(oldStyle)
     if not Editor.activeRouteName then return end
     local route = NS.Routes[Editor.activeRouteName]
     if not route then return end
@@ -443,6 +458,65 @@ function Editor.UpdateSelectedStyle()
     elseif Editor.selectedEdge then
         -- Editor.selectedEdge is a reference to the edge table {node1, node2, style=...}
         Editor.selectedEdge.style = style
+    else
+        -- No selection: Update route-level style and propagate to matching elements
+        route.style = route.style or {}
+        
+        -- Helper to check if two values are "effectively equal" (for colors and numbers)
+        local function IsEquivalent(v1, v2)
+            if v1 == v2 then return true end
+            if type(v1) == "table" and type(v2) == "table" then
+                if #v1 ~= #v2 then return false end
+                for i = 1, #v1 do
+                    if v1[i] ~= v2[i] then return false end
+                end
+                return true
+            end
+            return false
+        end
+
+        -- Helper to check if a style matches another style or global style
+        local function MatchesOriginal(s, original, globalVal)
+            if not s then return true end -- Inheriting
+            if IsEquivalent(s, original) then return true end
+            if IsEquivalent(s, globalVal) then return true end
+            return false
+        end
+
+        local global = NS.DB.settings.globalStyle
+
+        -- Update route style
+        for k, v in pairs(style) do
+            route.style[k] = NS.Utils.DeepCopy(v)
+        end
+
+        -- Propagate to nodes
+        for _, node in pairs(route.nodes) do
+            if node.style then
+                if oldStyle then
+                    if MatchesOriginal(node.style.nodeColor, oldStyle.nodeColor, global.nodeColor) then
+                        node.style.nodeColor = NS.Utils.DeepCopy(style.nodeColor)
+                    end
+                    if MatchesOriginal(node.style.nodeSize, oldStyle.nodeSize, global.nodeSize) then
+                        node.style.nodeSize = style.nodeSize
+                    end
+                end
+            end
+        end
+
+        -- Propagate to edges
+        for _, edge in ipairs(route.edges) do
+            if edge.style then
+                if oldStyle then
+                    if MatchesOriginal(edge.style.edgeColor, oldStyle.edgeColor, global.edgeColor) then
+                        edge.style.edgeColor = NS.Utils.DeepCopy(style.edgeColor)
+                    end
+                    if MatchesOriginal(edge.style.edgeThickness, oldStyle.edgeThickness, global.edgeThickness) then
+                        edge.style.edgeThickness = style.edgeThickness
+                    end
+                end
+            end
+        end
     end
     
     if NS.MapRenderer and NS.MapRenderer.DrawRoutes then NS.MapRenderer.DrawRoutes() end

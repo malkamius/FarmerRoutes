@@ -13,6 +13,8 @@
 *   **Advanced Styling & Inheritance**: Granular control over node and edge visuals with a 3-tier inheritance model (Global → Route → Item).
 *   **Sync & Sharing**: Import/Export routes via strings. Fully compatible with legacy RoutePlanner strings.
 *   **Multi-Character Support**: Manage routes across all your characters with bulk import capabilities.
+*   **Smart Bulk Updates**: Changing route-level styles automatically propagates to all nodes and edges matching the previous defaults.
+*   **Fluid Map Interaction**: Integrated map panning and high-priority click detection ensure seamless editing even over dense resource icons.
 
 ---
 

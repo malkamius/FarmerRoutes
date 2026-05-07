@@ -2,7 +2,7 @@
 ## Title: FarmerRoutes
 ## Notes: Graph-based routing system for farming routes.
 ## Author: Gemini
-## Version: 1.0.5
+## Version: 1.1.0
 ## SavedVariables: FarmerRoutesDB
 
 # Libraries

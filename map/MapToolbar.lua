@@ -671,11 +671,12 @@ function Toolbar.Init()
         ColorPickerFrame.previousValues = { style.nodeColor[1], style.nodeColor[2], style.nodeColor[3], style.nodeColor
             [4] }
         ColorPickerFrame.func = function()
+            local oldStyle = NS.Utils.DeepCopy(NS.DB.settings.currentStyle)
             local r, g, b = ColorPickerFrame:GetColorRGB()
             local a = 1 - OpacitySliderFrame:GetValue()
             style.nodeColor = { r, g, b, a }
             Toolbar.UpdateStyleUI()
-            if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle() end
+            if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle(oldStyle) end
         end
         ColorPickerFrame.swatchFunc = ColorPickerFrame.func
         ColorPickerFrame.opacityFunc = ColorPickerFrame.func
@@ -691,8 +692,9 @@ function Toolbar.Init()
     local sliderNodeSize = CreateStyleSlider("FarmerRoutesNodeSizeSlider", styleDrawer, 4, 24, "Size")
     sliderNodeSize:SetPoint("LEFT", btnNodeColor, "RIGHT", 20, 0)
     sliderNodeSize:SetScript("OnValueChanged", function(self, value)
+        local oldStyle = NS.Utils.DeepCopy(NS.DB.settings.currentStyle)
         NS.DB.settings.currentStyle.nodeSize = value
-        if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle() end
+        if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle(oldStyle) end
     end)
     styleDrawer.sliderNodeSize = sliderNodeSize
 
@@ -712,11 +714,12 @@ function Toolbar.Init()
         ColorPickerFrame.previousValues = { style.edgeColor[1], style.edgeColor[2], style.edgeColor[3], style.edgeColor
             [4] }
         ColorPickerFrame.func = function()
+            local oldStyle = NS.Utils.DeepCopy(NS.DB.settings.currentStyle)
             local r, g, b = ColorPickerFrame:GetColorRGB()
             local a = 1 - OpacitySliderFrame:GetValue()
             style.edgeColor = { r, g, b, a }
             Toolbar.UpdateStyleUI()
-            if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle() end
+            if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle(oldStyle) end
         end
         ColorPickerFrame.swatchFunc = ColorPickerFrame.func
         ColorPickerFrame.opacityFunc = ColorPickerFrame.func
@@ -732,8 +735,9 @@ function Toolbar.Init()
     local sliderEdgeThickness = CreateStyleSlider("FarmerRoutesEdgeThicknessSlider", styleDrawer, 1, 10, "Thickness")
     sliderEdgeThickness:SetPoint("LEFT", btnEdgeColor, "RIGHT", 20, 0)
     sliderEdgeThickness:SetScript("OnValueChanged", function(self, value)
+        local oldStyle = NS.Utils.DeepCopy(NS.DB.settings.currentStyle)
         NS.DB.settings.currentStyle.edgeThickness = value
-        if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle() end
+        if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle(oldStyle) end
     end)
     styleDrawer.sliderEdgeThickness = sliderEdgeThickness
 
