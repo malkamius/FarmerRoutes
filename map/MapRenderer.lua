@@ -151,11 +151,12 @@ function Renderer.DrawRoutes()
                     local style = NS.Data.GetEffectiveEdgeStyle(route, edge)
 
                     if isSelectedEdge and NS.MapEditor.isEditing and isEditingRoute then
-                        line:SetColorTexture(1, 1, 1, 1)
+                        local r, g, b, a = unpack(style.edgeColor)
+                        line:SetColorTexture(r, g, b, a)
                         line:SetThickness(style.edgeThickness + 6)
                     else
                         local r, g, b, a = unpack(style.edgeColor)
-                        line:SetColorTexture(r, g, b, (NS.MapEditor.isEditing and isEditingRoute and 0.7 or 0.4))
+                        line:SetColorTexture(r, g, b, a)
                         line:SetThickness(style.edgeThickness + (NS.MapEditor.isEditing and isEditingRoute and 4 or 2))
                     end
 
@@ -182,17 +183,18 @@ function Renderer.DrawRoutes()
                 local nr, ng, nb, na = unpack(style.nodeColor)
                 local ns = style.nodeSize
 
-                if isEditingRoute then na = 1.0 end
+                -- if isEditingRoute then na = 1.0 end
 
                 node.tex:SetColorTexture(nr, ng, nb, na)
 
                 local isSelectedNode = (routeName == activeRouteName) and (id == selectedNodeID)
+
                 if isSelectedNode then
-                    node.border:SetColorTexture(1, 1, 1, 1)
                     node:SetSize(ns + 6, ns + 6)
+                    node.border:SetColorTexture(1, 0.9, 0, 0.8)
                 else
-                    node.border:SetColorTexture(0, 0, 0, 1)
                     node:SetSize(ns, ns)
+                    node.border:SetColorTexture(0.65, 0.65, 0.65, 0.6)
                 end
 
                 local x = nodeData.x * canvasWidth
