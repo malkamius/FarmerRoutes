@@ -8,7 +8,15 @@ Toolbar.toolbarFrame = nil
 local currentXOffset = 0
 
 local function GetToolbarAnchor()
-    return WorldMapFrame
+    if WorldMapFrame then
+        if WorldMapFrame.ScrollContainer then
+            return WorldMapFrame.ScrollContainer
+        elseif WorldMapScrollFrame then
+            return WorldMapScrollFrame
+        end
+        return WorldMapFrame
+    end
+    return UIParent
 end
 
 local function ResetToolbarPosition()
@@ -25,20 +33,39 @@ local function SaveToolbarPosition()
         local anchor = GetToolbarAnchor()
         local s = Toolbar.toolbarFrame:GetEffectiveScale()
         local as = anchor:GetEffectiveScale()
-        local x, y = Toolbar.toolbarFrame:GetCenter()
-        local ax, ay = anchor:GetCenter()
+        local x = Toolbar.toolbarFrame:GetCenter()
+        local ax = anchor:GetCenter()
+        local bottom = Toolbar.toolbarFrame:GetBottom()
+        local aBottom = anchor:GetBottom()
 
-        if x and y and ax and ay then
+        if x and bottom and ax and aBottom then
             local xOfs = (x * s - ax * as) / s
-            local yOfs = (y * s - ay * as) / s
+            local yOfs = (bottom * s - aBottom * as) / s
 
             NS.DB.settings.toolbarPosition = {
-                point = "CENTER",
-                relativePoint = "CENTER",
+                point = "BOTTOM",
+                relativePoint = "BOTTOM",
                 xOfs = xOfs,
                 yOfs = yOfs
             }
         end
+    end
+end
+
+local function RestoreToolbarPosition()
+    if not Toolbar.toolbarFrame then return end
+    local savedPos = NS.DB.settings.toolbarPosition
+    -- Clear out legacy CENTER-anchored position so it resets to the new bottom anchor
+    if savedPos and savedPos.point == "CENTER" then
+        savedPos = nil
+        NS.DB.settings.toolbarPosition = nil
+    end
+
+    if savedPos and savedPos.point and savedPos.relativePoint then
+        Toolbar.toolbarFrame:ClearAllPoints()
+        Toolbar.toolbarFrame:SetPoint(savedPos.point, GetToolbarAnchor(), savedPos.relativePoint, savedPos.xOfs, savedPos.yOfs)
+    else
+        ResetToolbarPosition()
     end
 end
 
@@ -169,8 +196,98 @@ StaticPopupDialogs["FARMERROUTES_CONFIRM_DELETE_ROUTE"] = {
     preferredIndex = 3,
 }
 
+local currentAnchorTarget = nil
+local currentAnchorOffset = nil
+local isToggleHooked = false
+local UpdateMapButtonPosition
+
+local function HookSidePanelToggle(toggle)
+    if isToggleHooked or not toggle then return end
+    isToggleHooked = true
+
+    local function OnToggleTriggered()
+        if C_Timer and C_Timer.After then
+            C_Timer.After(0.01, function()
+                if UpdateMapButtonPosition then
+                    UpdateMapButtonPosition()
+                end
+            end)
+        else
+            if UpdateMapButtonPosition then
+                UpdateMapButtonPosition()
+            end
+        end
+    end
+
+    if toggle.HookScript then
+        toggle:HookScript("OnClick", OnToggleTriggered)
+    end
+    if toggle.OpenButton and toggle.OpenButton.HookScript then
+        toggle.OpenButton:HookScript("OnClick", OnToggleTriggered)
+    end
+    if toggle.CloseButton and toggle.CloseButton.HookScript then
+        toggle.CloseButton:HookScript("OnClick", OnToggleTriggered)
+    end
+end
+
 local function UpdateMapButtonPosition()
     if not mapButton then return end
+
+    if NS.WOW_FLAVOR == "Forever" then
+        local toggle = WorldMapFrame and WorldMapFrame.SidePanelToggle
+        if not toggle and QuestMapFrame then
+            toggle = QuestMapFrame.SidePanelToggle
+        end
+
+        if toggle then
+            HookSidePanelToggle(toggle)
+
+            local target = toggle
+            if not (target:IsShown() and target:GetWidth() and target:GetWidth() > 0) then
+                if toggle.CloseButton and toggle.CloseButton:IsShown() then
+                    target = toggle.CloseButton
+                elseif toggle.OpenButton and toggle.OpenButton:IsShown() then
+                    target = toggle.OpenButton
+                end
+            end
+
+            if target then
+                local xOffset = 4
+                local parent = target:GetParent() or WorldMapFrame
+                if parent then
+                    for _, child in ipairs({ parent:GetChildren() }) do
+                        if child:IsShown() and child ~= mapButton and (child:IsObjectType("Button") or (child.GetWidth and child:GetWidth() and child:GetWidth() < 100)) then
+                            for i = 1, child:GetNumPoints() do
+                                local point, relTo, relPoint, x, y = child:GetPoint(i)
+                                if (relTo == target or relTo == toggle) and (relPoint == "LEFT" or relPoint == "TOPLEFT" or relPoint == "BOTTOMLEFT") then
+                                    local w = child:GetWidth() or 0
+                                    local edge = math.abs(x or 0) + w + 4
+                                    if edge > xOffset then
+                                        xOffset = edge
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+
+                if currentAnchorTarget ~= target or currentAnchorOffset ~= xOffset then
+                    mapButton:ClearAllPoints()
+                    mapButton:SetPoint("RIGHT", target, "LEFT", -xOffset, 0)
+                    currentAnchorTarget = target
+                    currentAnchorOffset = xOffset
+                    currentXOffset = nil
+                end
+
+                local targetLevel = (target.GetFrameLevel and target:GetFrameLevel()) or WorldMapFrame:GetFrameLevel()
+                mapButton:SetFrameLevel(targetLevel + 5)
+                return
+            end
+        end
+    end
+
+    currentAnchorTarget = nil
+    currentAnchorOffset = nil
 
     local xOffset = 35 -- Starting offset (covers standard Close button)
 
@@ -270,8 +387,15 @@ function Toolbar.Init()
 
     -- Ensure position is correct based on other top-right icons
     UpdateMapButtonPosition()
+    if WorldMapFrame.HookScript then
+        WorldMapFrame:HookScript("OnSizeChanged", function()
+            UpdateMapButtonPosition()
+            RestoreToolbarPosition()
+        end)
+    end
     WorldMapFrame:HookScript("OnShow", function()
         UpdateMapButtonPosition()
+        RestoreToolbarPosition()
         updateTimer = 0
         totalUpdateDuration = 0
         mapButton:SetScript("OnUpdate", MapButton_OnUpdate)
@@ -336,13 +460,7 @@ function Toolbar.Init()
     })
 
     -- Load or set default position
-    local savedPos = NS.DB.settings.toolbarPosition
-    if savedPos then
-        toolbarFrame:ClearAllPoints()
-        toolbarFrame:SetPoint(savedPos.point, GetToolbarAnchor(), savedPos.relativePoint, savedPos.xOfs, savedPos.yOfs)
-    else
-        ResetToolbarPosition()
-    end
+    RestoreToolbarPosition()
 
     -- Dragging
     toolbarFrame:SetMovable(true)
@@ -665,26 +783,23 @@ function Toolbar.Init()
     local btnNodeColor = CreateColorButton(styleDrawer, "  Color", function()
         local style = NS.DB.settings.currentStyle
         if not style.nodeColor then return end -- Safety check
-        ColorPickerFrame:SetColorRGB(style.nodeColor[1], style.nodeColor[2], style.nodeColor[3])
-        ColorPickerFrame.hasOpacity = true
-        ColorPickerFrame.opacity = 1 - style.nodeColor[4]
-        ColorPickerFrame.previousValues = { style.nodeColor[1], style.nodeColor[2], style.nodeColor[3], style.nodeColor
-            [4] }
-        ColorPickerFrame.func = function()
-            local oldStyle = NS.Utils.DeepCopy(NS.DB.settings.currentStyle)
-            local r, g, b = ColorPickerFrame:GetColorRGB()
-            local a = 1 - OpacitySliderFrame:GetValue()
-            style.nodeColor = { r, g, b, a }
-            Toolbar.UpdateStyleUI()
-            if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle(oldStyle) end
-        end
-        ColorPickerFrame.swatchFunc = ColorPickerFrame.func
-        ColorPickerFrame.opacityFunc = ColorPickerFrame.func
-        ColorPickerFrame.cancelFunc = function(prev)
-            style.nodeColor = { prev[1], prev[2], prev[3], prev[4] }
-            Toolbar.UpdateStyleUI()
-        end
-        ColorPickerFrame:Show()
+        NS.Utils.ShowColorPicker({
+            r = style.nodeColor[1],
+            g = style.nodeColor[2],
+            b = style.nodeColor[3],
+            a = style.nodeColor[4],
+            hasOpacity = true,
+            onColorChanged = function(r, g, b, a)
+                local oldStyle = NS.Utils.DeepCopy(NS.DB.settings.currentStyle)
+                style.nodeColor = { r, g, b, a }
+                Toolbar.UpdateStyleUI()
+                if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle(oldStyle) end
+            end,
+            onCancel = function(r, g, b, a)
+                style.nodeColor = { r, g, b, a }
+                Toolbar.UpdateStyleUI()
+            end,
+        })
     end)
     btnNodeColor:SetPoint("LEFT", nodeLabel, "RIGHT", 10, 0)
     styleDrawer.btnNodeColor = btnNodeColor
@@ -708,26 +823,23 @@ function Toolbar.Init()
         -- Ensure defaults if missing
         if not style.edgeColor then return end -- Safety check
 
-        ColorPickerFrame:SetColorRGB(style.edgeColor[1], style.edgeColor[2], style.edgeColor[3])
-        ColorPickerFrame.hasOpacity = true
-        ColorPickerFrame.opacity = 1 - style.edgeColor[4]
-        ColorPickerFrame.previousValues = { style.edgeColor[1], style.edgeColor[2], style.edgeColor[3], style.edgeColor
-            [4] }
-        ColorPickerFrame.func = function()
-            local oldStyle = NS.Utils.DeepCopy(NS.DB.settings.currentStyle)
-            local r, g, b = ColorPickerFrame:GetColorRGB()
-            local a = 1 - OpacitySliderFrame:GetValue()
-            style.edgeColor = { r, g, b, a }
-            Toolbar.UpdateStyleUI()
-            if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle(oldStyle) end
-        end
-        ColorPickerFrame.swatchFunc = ColorPickerFrame.func
-        ColorPickerFrame.opacityFunc = ColorPickerFrame.func
-        ColorPickerFrame.cancelFunc = function(prev)
-            style.edgeColor = { prev[1], prev[2], prev[3], prev[4] }
-            Toolbar.UpdateStyleUI()
-        end
-        ColorPickerFrame:Show()
+        NS.Utils.ShowColorPicker({
+            r = style.edgeColor[1],
+            g = style.edgeColor[2],
+            b = style.edgeColor[3],
+            a = style.edgeColor[4],
+            hasOpacity = true,
+            onColorChanged = function(r, g, b, a)
+                local oldStyle = NS.Utils.DeepCopy(NS.DB.settings.currentStyle)
+                style.edgeColor = { r, g, b, a }
+                Toolbar.UpdateStyleUI()
+                if NS.MapEditor and NS.MapEditor.UpdateSelectedStyle then NS.MapEditor.UpdateSelectedStyle(oldStyle) end
+            end,
+            onCancel = function(r, g, b, a)
+                style.edgeColor = { r, g, b, a }
+                Toolbar.UpdateStyleUI()
+            end,
+        })
     end)
     btnEdgeColor:SetPoint("LEFT", edgeLabel, "RIGHT", 10, 0)
     styleDrawer.btnEdgeColor = btnEdgeColor

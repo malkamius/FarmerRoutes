@@ -222,12 +222,22 @@ local EventFrame = CreateFrame("Frame")
 
 -- Wait until PLAYER_LOGIN to hook into the map frame reliably
 EventFrame:RegisterEvent("PLAYER_LOGIN")
+EventFrame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
+EventFrame:RegisterEvent("ZONE_CHANGED")
 EventFrame:SetScript("OnEvent", function(self, event)
     if event == "PLAYER_LOGIN" then
-        -- Hook Map Changes
-        hooksecurefunc(WorldMapFrame, "OnMapChanged", function()
-            Renderer.DrawRoutes()
-        end)
+        -- Hook Map Changes (Classic Era uses OnMapChanged; modern retail/Camelot uses SetMapID or OnMapChanged)
+        if WorldMapFrame.OnMapChanged then
+            hooksecurefunc(WorldMapFrame, "OnMapChanged", function()
+                Renderer.DrawRoutes()
+            end)
+        end
+
+        if WorldMapFrame.SetMapID then
+            hooksecurefunc(WorldMapFrame, "SetMapID", function()
+                Renderer.DrawRoutes()
+            end)
+        end
 
         -- Hook Map Show/Hide
         WorldMapFrame:HookScript("OnShow", function()
@@ -237,5 +247,9 @@ EventFrame:SetScript("OnEvent", function(self, event)
         WorldMapFrame:HookScript("OnHide", function()
             Renderer.Clear()
         end)
+    elseif event == "ZONE_CHANGED_NEW_AREA" or event == "ZONE_CHANGED" then
+        if WorldMapFrame and WorldMapFrame:IsShown() then
+            Renderer.DrawRoutes()
+        end
     end
 end)

@@ -345,77 +345,96 @@ function UI.RenderSync()
     yOffset = yOffset - 30
 
     local db = NS.DB
-    if not db or not db.charData then return end
+    if not db then return end
 
-    local currentCharKey = UnitName("player") .. " - " .. GetRealmName()
-    local charKeys = {}
-    for key, _ in pairs(db.charData) do
-        if key ~= currentCharKey then table.insert(charKeys, key) end
+    local currentCharKey = NS.Utils.GetCharacterKey()
+    local charSources = {}
+
+    if FarmerRoutesDB then
+        for flavorName, flavorDB in pairs(FarmerRoutesDB) do
+            if type(flavorDB) == "table" and flavorDB.charData then
+                for key, charData in pairs(flavorDB.charData) do
+                    if not (flavorName == NS.WOW_FLAVOR and key == currentCharKey) then
+                        if charData.routes and next(charData.routes) then
+                            local label = key
+                            if flavorName ~= NS.WOW_FLAVOR then
+                                label = key .. " (" .. flavorName .. ")"
+                            end
+                            table.insert(charSources, { label = label, charData = charData })
+                        end
+                    end
+                end
+            end
+        end
     end
-    table.sort(charKeys)
 
-    if #charKeys == 0 then
+    table.sort(charSources, function(a, b) return a.label < b.label end)
+
+    if #charSources == 0 then
         local msg = content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         msg:SetPoint("TOPLEFT", 10, yOffset)
         msg:SetText("No other characters found.")
         return
     end
 
-    for _, charKey in ipairs(charKeys) do
-        local charData = db.charData[charKey]
-        if charData.routes and next(charData.routes) then
-            local charHeader = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-            charHeader:SetPoint("TOPLEFT", 10, yOffset)
-            charHeader:SetText(charKey)
-            
-            local btnAll = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-            btnAll:SetSize(80, 18)
-            btnAll:SetPoint("TOPRIGHT", -10, yOffset)
-            btnAll:SetText("Import All")
-            btnAll:SetScript("OnClick", function()
-                for rName, rData in pairs(charData.routes) do
-                    local newRoute = NS.Utils.DeepCopy(rData)
-                    local name = rName
+    for _, source in ipairs(charSources) do
+        local charHeader = content:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        charHeader:SetPoint("TOPLEFT", 10, yOffset)
+        charHeader:SetText(source.label)
+
+        local btnAll = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+        btnAll:SetSize(80, 18)
+        btnAll:SetPoint("TOPRIGHT", -10, yOffset)
+        btnAll:SetText("Import All")
+        local capturedCharData = source.charData
+        local sourceLabel = source.label
+        btnAll:SetScript("OnClick", function()
+            for rName, rData in pairs(capturedCharData.routes) do
+                local newRoute = NS.Utils.DeepCopy(rData)
+                local name = rName
+                local i = 1
+                while NS.Routes[name] do
+                    name = rName .. " (" .. i .. ")"
+                    i = i + 1
+                end
+                newRoute.name = name
+                NS.Routes[name] = newRoute
+                print("|cFFFFFF00FarmerRoutes|r: Imported '" .. name .. "' from " .. sourceLabel)
+            end
+            UI.Refresh()
+            if NS.MapRenderer and NS.MapRenderer.DrawRoutes then NS.MapRenderer.DrawRoutes() end
+            if NS.MinimapRenderer and NS.MinimapRenderer.MarkDirty then NS.MinimapRenderer.MarkDirty() end
+        end)
+
+        yOffset = yOffset - 20
+
+        for routeName, _ in pairs(capturedCharData.routes) do
+            local btn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
+            btn:SetSize(300, 20)
+            btn:SetPoint("TOPLEFT", 20, yOffset)
+            btn:SetText(routeName)
+            local capturedRoute = capturedCharData.routes[routeName]
+            local baseName = routeName
+            btn:SetScript("OnClick", function()
+                if capturedRoute then
+                    local newRoute = NS.Utils.DeepCopy(capturedRoute)
+                    local name = baseName
                     local i = 1
                     while NS.Routes[name] do
-                        name = rName .. " (" .. i .. ")"
+                        name = baseName .. " (" .. i .. ")"
                         i = i + 1
                     end
                     newRoute.name = name
                     NS.Routes[name] = newRoute
-                    print("|cFFFFFF00FarmerRoutes|r: Imported '" .. name .. "' from " .. charKey)
+                    print("|cFFFFFF00FarmerRoutes|r: Imported '" .. name .. "' from " .. sourceLabel)
+                    UI.Refresh()
+                    if NS.MapRenderer and NS.MapRenderer.DrawRoutes then NS.MapRenderer.DrawRoutes() end
+                    if NS.MinimapRenderer and NS.MinimapRenderer.MarkDirty then NS.MinimapRenderer.MarkDirty() end
                 end
-                UI.Refresh()
             end)
-
-            yOffset = yOffset - 20
-
-            for routeName, _ in pairs(charData.routes) do
-                local btn = CreateFrame("Button", nil, content, "UIPanelButtonTemplate")
-                btn:SetSize(300, 20)
-                btn:SetPoint("TOPLEFT", 20, yOffset)
-                btn:SetText(routeName)
-                btn:SetScript("OnClick", function()
-                    local sourceRoute = charData.routes[routeName]
-                    if sourceRoute then
-                        local newRoute = NS.Utils.DeepCopy(sourceRoute)
-                        local baseName = routeName
-                        local name = baseName
-                        local i = 1
-                        while NS.Routes[name] do
-                            name = baseName .. " (" .. i .. ")"
-                            i = i + 1
-                        end
-                        newRoute.name = name
-                        NS.Routes[name] = newRoute
-                        print("|cFFFFFF00FarmerRoutes|r: Imported '" .. name .. "' from " .. charKey)
-                        UI.Refresh()
-                    end
-                end)
-                yOffset = yOffset - 22
-            end
-            yOffset = yOffset - 10
+            yOffset = yOffset - 22
         end
+        yOffset = yOffset - 10
     end
 
     content:SetHeight(math.abs(yOffset) + 20)
@@ -471,28 +490,25 @@ function UI.RenderGlobalStyles()
     yOffset = yOffset - 30
 
     local btnNodeColor = CreateColorButton(content, "  Color", function(self)
-        ColorPickerFrame:SetColorRGB(style.nodeColor[1], style.nodeColor[2], style.nodeColor[3])
-        ColorPickerFrame.hasOpacity = true
-        ColorPickerFrame.opacity = 1 - style.nodeColor[4]
-        ColorPickerFrame.previousValues = { style.nodeColor[1], style.nodeColor[2], style.nodeColor[3], style.nodeColor
-            [4] }
-        ColorPickerFrame.func = function()
-            local r, g, b = ColorPickerFrame:GetColorRGB()
-            local a = 1 - OpacitySliderFrame:GetValue()
-            style.nodeColor = { r, g, b, a }
-            self.swatch:SetColorTexture(r, g, b, a)
-            if NS.MapRenderer then NS.MapRenderer.DrawRoutes() end
-            if NS.MinimapRenderer then NS.MinimapRenderer.MarkDirty() end
-        end
-        ColorPickerFrame.swatchFunc = ColorPickerFrame.func
-        ColorPickerFrame.opacityFunc = ColorPickerFrame.func
-        ColorPickerFrame.cancelFunc = function(prev)
-            style.nodeColor = { prev[1], prev[2], prev[3], prev[4] }
-            self.swatch:SetColorTexture(prev[1], prev[2], prev[3], prev[4])
-            if NS.MapRenderer then NS.MapRenderer.DrawRoutes() end
-            if NS.MinimapRenderer then NS.MinimapRenderer.MarkDirty() end
-        end
-        ColorPickerFrame:Show()
+        NS.Utils.ShowColorPicker({
+            r = style.nodeColor[1],
+            g = style.nodeColor[2],
+            b = style.nodeColor[3],
+            a = style.nodeColor[4],
+            hasOpacity = true,
+            onColorChanged = function(r, g, b, a)
+                style.nodeColor = { r, g, b, a }
+                self.swatch:SetColorTexture(r, g, b, a)
+                if NS.MapRenderer then NS.MapRenderer.DrawRoutes() end
+                if NS.MinimapRenderer then NS.MinimapRenderer.MarkDirty() end
+            end,
+            onCancel = function(r, g, b, a)
+                style.nodeColor = { r, g, b, a }
+                self.swatch:SetColorTexture(r, g, b, a)
+                if NS.MapRenderer then NS.MapRenderer.DrawRoutes() end
+                if NS.MinimapRenderer then NS.MinimapRenderer.MarkDirty() end
+            end,
+        })
     end, style.nodeColor)
     btnNodeColor:SetPoint("TOPLEFT", 20, yOffset)
 
@@ -513,28 +529,25 @@ function UI.RenderGlobalStyles()
     yOffset = yOffset - 30
 
     local btnEdgeColor = CreateColorButton(content, "  Color", function(self)
-        ColorPickerFrame:SetColorRGB(style.edgeColor[1], style.edgeColor[2], style.edgeColor[3])
-        ColorPickerFrame.hasOpacity = true
-        ColorPickerFrame.opacity = 1 - style.edgeColor[4]
-        ColorPickerFrame.previousValues = { style.edgeColor[1], style.edgeColor[2], style.edgeColor[3], style.edgeColor
-            [4] }
-        ColorPickerFrame.func = function()
-            local r, g, b = ColorPickerFrame:GetColorRGB()
-            local a = 1 - OpacitySliderFrame:GetValue()
-            style.edgeColor = { r, g, b, a }
-            self.swatch:SetColorTexture(r, g, b, a)
-            if NS.MapRenderer then NS.MapRenderer.DrawRoutes() end
-            if NS.MinimapRenderer then NS.MinimapRenderer.MarkDirty() end
-        end
-        ColorPickerFrame.swatchFunc = ColorPickerFrame.func
-        ColorPickerFrame.opacityFunc = ColorPickerFrame.func
-        ColorPickerFrame.cancelFunc = function(prev)
-            style.edgeColor = { prev[1], prev[2], prev[3], prev[4] }
-            self.swatch:SetColorTexture(prev[1], prev[2], prev[3], prev[4])
-            if NS.MapRenderer then NS.MapRenderer.DrawRoutes() end
-            if NS.MinimapRenderer then NS.MinimapRenderer.MarkDirty() end
-        end
-        ColorPickerFrame:Show()
+        NS.Utils.ShowColorPicker({
+            r = style.edgeColor[1],
+            g = style.edgeColor[2],
+            b = style.edgeColor[3],
+            a = style.edgeColor[4],
+            hasOpacity = true,
+            onColorChanged = function(r, g, b, a)
+                style.edgeColor = { r, g, b, a }
+                self.swatch:SetColorTexture(r, g, b, a)
+                if NS.MapRenderer then NS.MapRenderer.DrawRoutes() end
+                if NS.MinimapRenderer then NS.MinimapRenderer.MarkDirty() end
+            end,
+            onCancel = function(r, g, b, a)
+                style.edgeColor = { r, g, b, a }
+                self.swatch:SetColorTexture(r, g, b, a)
+                if NS.MapRenderer then NS.MapRenderer.DrawRoutes() end
+                if NS.MinimapRenderer then NS.MinimapRenderer.MarkDirty() end
+            end,
+        })
     end, style.edgeColor)
     btnEdgeColor:SetPoint("TOPLEFT", 20, yOffset)
 
